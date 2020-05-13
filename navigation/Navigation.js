@@ -3,10 +3,11 @@ import Home from '../screens/Home';
 import Directory from '../screens/Directory';
 import Chatbot from '../screens/Chatbot';
 import Colors from '../variables/Colors';
+import {Button} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 
-const Navigation = () => {
+const Navigation = ({logout}) => {
   const Stack = createStackNavigator();
 
   return (
@@ -18,6 +19,7 @@ const Navigation = () => {
           headerTitleStyle: {
             display: 'none',
           },
+          headerRight: () => <Button title="Logout" onPress={logout} />,
         }}>
         <Stack.Screen name="Rediminds" component={Home} />
         <Stack.Screen name="Directory" component={Directory} />
