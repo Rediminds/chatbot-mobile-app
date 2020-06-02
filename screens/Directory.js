@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useLayoutEffect} from 'react';
 import {View, StyleSheet, Button} from 'react-native';
 import prostateAvatar from '../assets/prostate_avatar.png';
 import covidAvatar from '../assets/covid_avatar.png';
@@ -6,7 +6,14 @@ import jokesAvatar from '../assets/jokes_avatar.png';
 
 import Colors from '../variables/Colors';
 
-export const Directory = ({navigation, route}) => {
+export const Directory = ({navigation}) => {
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Button title="Home" onPress={() => navigation.navigate('Home')} />
+      ),
+    });
+  });
   return (
     <View style={styles.screen}>
       <View style={styles.buttons}>
