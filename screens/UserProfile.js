@@ -10,7 +10,6 @@ import {
 import Colors from '../variables/Colors';
 
 const UserProfile = ({profile, navigation}) => {
-  console.log('profile: ', profile);
   useLayoutEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
@@ -23,14 +22,14 @@ const UserProfile = ({profile, navigation}) => {
       ),
     });
   });
-  const {email, name} = profile;
+  const {email, name, picture} = profile;
   return (
     <View style={styles.screen}>
       <View>
-        <Image source={{uri: profile.picture}} style={styles.image} />
+        <Image source={{uri: picture ? picture : ''}} style={styles.image} />
       </View>
-      <Text style={styles.name}>{name}</Text>
-      <Text style={styles.email}>{email}</Text>
+      <Text style={styles.name}>{name ? name : ''}</Text>
+      <Text style={styles.email}>{email ? email : ''}</Text>
     </View>
   );
 };

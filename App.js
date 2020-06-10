@@ -1,132 +1,81 @@
-import React, {
-  useEffect,
-  useReducer,
-  createContext,
-  useMemo,
-  useContext,
-} from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  Image,
-  Button,
-  TouchableOpacity,
-  ImageBackground,
-} from 'react-native';
+import React, {useEffect, useReducer, createContext, useMemo} from 'react';
+import {Image, TouchableOpacity} from 'react-native';
 import AsyncStorage from '@react-native-community/async-storage';
 import {auth0} from './auth/auth0';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
-import CompanyLogo from './assets/company_logo.png';
 import Home from './screens/Home';
 import Directory from './screens/Directory';
 import Chatbot from './screens/Chatbot';
 import UserProfile from './screens/UserProfile';
 import Unknown from './assets/unnamed_user.png';
-import LogoutIcon from './assets/logout.png';
-import LoginBG from './assets/login_background.jpg';
-import Colors from './variables/Colors';
+import Splash from './screens/Splash';
+import {styles} from './styles/styles';
+import Login from './screens/Login';
+import Logout from './components/Logout';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 const Stack = createStackNavigator();
-
-const SplashScreen = () => {
-  return (
-    <View>
-      <Text>Loading...</Text>
-    </View>
-  );
-};
-
-const Login = () => {
-  const {signIn} = useContext(AuthContext);
-  return (
-    <View style={styles.screen}>
-      <ImageBackground source={LoginBG} style={styles.bg}>
-        <View style={styles.logoAndButton}>
-          <View style={styles.logoWrapper}>
-            <View style={styles.companyLogo}>
-              <Image source={CompanyLogo} />
-            </View>
-            <View>
-              <Text style={styles.title}>RediMinds, Inc</Text>
-              <Text style={styles.motto}>
-                Data is <Text style={styles.mottoWord}>Power</Text>
-              </Text>
-            </View>
-          </View>
-          <View style={styles.loginBtn}>
-            <Button title="Login" onPress={signIn} color={Colors.ghostWhite} />
-          </View>
-        </View>
-      </ImageBackground>
-    </View>
-  );
-};
-
-const Logout = () => {
-  const {signOut} = useContext(AuthContext);
-  return (
-    <TouchableOpacity onPress={signOut}>
-      <Image source={LogoutIcon} style={styles.logoutBtn} />
-    </TouchableOpacity>
-  );
-};
 
 const App = () => {
   const [state, dispatch] = useReducer(
     (prevState, action) => {
-      switch (action.type) {
+      console.log('action: ', action);
+      const {type, payload} = action;
+      switch (type) {
         case 'RESTORE_TOKEN':
           return {
             ...prevState,
-            userToken: action.token,
-            isLoading: false,
+            token: payload,
+            loading: false,
           };
         case 'SIGN_IN':
+          AsyncStorage.setItem('token', payload);
           return {
             ...prevState,
             isSignOut: false,
-            userToken: action.token,
+            token: payload,
+            loading: false,
           };
         case 'SIGN_OUT':
+          AsyncStorage.removeItem('token');
           return {
             ...prevState,
             isSignOut: true,
-            userToken: null,
-            userProfile: null,
+            token: null,
+            user: null,
+            loading: false,
           };
         case 'USER':
+          AsyncStorage.setItem('profile', JSON.stringify(payload));
           return {
             ...prevState,
-            userProfile: action.userProfile,
+            user: payload,
+            loading: false,
           };
         default:
           return prevState;
       }
     },
     {
-      isLoading: true,
+      loading: true,
       isSignOut: false,
-      userToken: null,
-      userProfile: null,
+      token: null,
+      user: null,
     },
   );
 
   useEffect(() => {
     const getUserToken = async () => {
-      let userToken;
-      let profile;
       try {
-        userToken = await AsyncStorage.getItem('idToken');
-        profile = await AsyncStorage.getItem('profile');
+        let token = await AsyncStorage.getItem('token');
+        let user = await AsyncStorage.getItem('profile');
+        dispatch({type: 'RESTORE_TOKEN', payload: token});
+        dispatch({type: 'USER', payload: JSON.parse(user)});
       } catch (err) {
         console.log('Restoring token failed: ', err);
       }
-      dispatch({type: 'RESTORE_TOKEN', token: userToken});
-      dispatch({type: 'USER', userProfile: JSON.parse(profile)});
     };
     getUserToken();
   }, []);
@@ -143,10 +92,8 @@ const App = () => {
             auth0.auth.userInfo({token: res.accessToken}).then(async (user) => {
               console.log('user: ', user);
               try {
-                dispatch({type: 'SIGN_IN', token: res.idToken});
-                dispatch({type: 'USER', userProfile: user});
-                await AsyncStorage.setItem('idToken', res.idToken);
-                await AsyncStorage.setItem('profile', JSON.stringify(user));
+                dispatch({type: 'SIGN_IN', payload: res.idToken});
+                dispatch({type: 'USER', payload: user});
               } catch (err) {
                 console.log('DID NOT SET TOKEN: ', err);
               }
@@ -161,8 +108,6 @@ const App = () => {
           .clearSession({})
           .then((success) => {
             dispatch({type: 'SIGN_OUT'});
-            AsyncStorage.removeItem('idToken');
-            AsyncStorage.removeItem('profile');
           })
           .catch((err) => {
             throw err;
@@ -172,72 +117,58 @@ const App = () => {
     [],
   );
 
+  const {loading, token, user, isSignOut} = state;
+
   return (
     <AuthContext.Provider value={authContext}>
       <NavigationContainer>
         <Stack.Navigator
-          screenOptions={({navigation, route}) => ({
+          screenOptions={({navigation: {navigate}, route: {name}}) => ({
             // animationEnabled: false,
             headerTitle: '',
             headerRight: () =>
-              state.isSignOut === false && route.name === 'Profile' ? (
+              isSignOut === false && name === 'Profile' ? (
                 <Logout />
               ) : (
-                state.isSignOut === false &&
-                (route.name === 'Directory' || route.name === 'Home') && (
+                isSignOut === false &&
+                (name === 'Directory' || name === 'Home') && (
                   <TouchableOpacity
                     onPress={() => {
-                      navigation.navigate('Profile');
+                      navigate('Profile');
                     }}>
                     <Image
-                      source={
-                        state.userProfile === null
-                          ? Unknown
-                          : {uri: state.userProfile.picture}
-                      }
+                      source={user === null ? Unknown : {uri: user.picture}}
                       style={styles.image}
                     />
                   </TouchableOpacity>
                 )
               ),
           })}>
-          {state.isLoading ? (
-            <Stack.Screen name="Splash" component={SplashScreen} />
-          ) : state.userToken === null ? (
+          {loading ? (
+            <Stack.Screen name="Splash" component={Splash} />
+          ) : token === null ? (
             <Stack.Screen
               name="SignIn"
               component={Login}
-              options={{
-                title: 'Sign In',
-                // animationTypeForReplace: state.isSignOut ? 'pop' : 'push',
-                headerRight: '',
-                headerShown: false,
-              }}
+              options={{headerShown: false}}
             />
           ) : (
             <>
               <Stack.Screen
-                options={() => ({
-                  headerTitle: 'HOME',
-                  headerLeft: '',
-                })}
                 name="Home"
                 component={Home}
+                options={{headerTitle: 'HOME'}}
               />
               <Stack.Screen
-                options={() => ({
-                  headerTitle: 'DIRECTORY',
-                })}
                 name="Directory"
                 component={Directory}
+                options={{headerTitle: 'DIRECTORY'}}
               />
               <Stack.Screen name="Chatbot">
-                {(props) => <Chatbot {...props} profile={state.userProfile} />}
+                {(props) => <Chatbot {...props} profile={user} />}
               </Stack.Screen>
               <Stack.Screen name="Profile">
-                {(props) => (
-                  <UserProfile {...props} profile={state.userProfile} />
-                )}
+                {(props) => <UserProfile {...props} profile={user} />}
               </Stack.Screen>
             </>
           )}
@@ -246,79 +177,4 @@ const App = () => {
     </AuthContext.Provider>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  screen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bg: {
-    flex: 1,
-    resizeMode: 'cover',
-    justifyContent: 'center',
-    width: '100%',
-    backgroundColor: 'black',
-  },
-  logoAndButton: {
-    backgroundColor: 'black',
-    width: '85%',
-    height: '40%',
-    borderRadius: 25,
-    alignSelf: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoWrapper: {
-    flexDirection: 'row',
-    marginVertical: 100,
-    justifyContent: 'space-between',
-    alignSelf: 'center',
-  },
-  companyLogo: {
-    marginHorizontal: 15,
-  },
-  title: {
-    fontSize: 30,
-    color: Colors.ghostWhite,
-    fontWeight: 'bold',
-  },
-  motto: {
-    fontSize: 20,
-    color: Colors.ghostWhite,
-    fontWeight: 'bold',
-  },
-  mottoWord: {
-    fontStyle: 'italic',
-    color: Colors.ghostWhite,
-    fontWeight: 'bold',
-  },
-  loginBtn: {
-    justifyContent: 'center',
-  },
-  button: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logout: {
-    top: 10,
-    left: 10,
-  },
-  image: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 15,
-  },
-  logoutBtn: {
-    width: 20,
-    height: 20,
-    marginRight: 15,
-  },
-});
-
 export default App;
