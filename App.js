@@ -1,6 +1,5 @@
 import React, {useEffect, useReducer, createContext, useMemo} from 'react';
 import {Image, TouchableOpacity} from 'react-native';
-import AsyncStorage from '@react-native-community/async-storage';
 import {auth0} from './auth/auth0';
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
@@ -14,6 +13,8 @@ import {styles} from './styles/styles';
 import Login from './screens/Login';
 import Logout from './components/Logout';
 
+import RNSecureKeyStore, {ACCESSIBLE} from 'react-native-secure-key-store';
+
 export const AuthContext = createContext();
 
 const Stack = createStackNavigator();
@@ -21,7 +22,6 @@ const Stack = createStackNavigator();
 const App = () => {
   const [state, dispatch] = useReducer(
     (prevState, action) => {
-      console.log('action: ', action);
       const {type, payload} = action;
       switch (type) {
         case 'RESTORE_TOKEN':
@@ -31,7 +31,9 @@ const App = () => {
             loading: false,
           };
         case 'SIGN_IN':
-          AsyncStorage.setItem('token', payload);
+          RNSecureKeyStore.set('token', payload, {
+            accessessible: ACCESSIBLE.ALWAYS_THIS_DEVICE_ONLY,
+          });
           return {
             ...prevState,
             isSignOut: false,
@@ -39,7 +41,14 @@ const App = () => {
             loading: false,
           };
         case 'SIGN_OUT':
-          AsyncStorage.removeItem('token');
+          RNSecureKeyStore.remove('token').then(
+            (res) => {
+              console.log('RES: ', res);
+            },
+            (err) => {
+              console.log('ERROR: ', err);
+            },
+          );
           return {
             ...prevState,
             isSignOut: true,
@@ -48,7 +57,9 @@ const App = () => {
             loading: false,
           };
         case 'USER':
-          AsyncStorage.setItem('profile', JSON.stringify(payload));
+          RNSecureKeyStore.set('profile', JSON.stringify(payload), {
+            accessessible: ACCESSIBLE.ALWAYS_THIS_DEVICE_ONLY,
+          });
           return {
             ...prevState,
             user: payload,
@@ -69,10 +80,25 @@ const App = () => {
   useEffect(() => {
     const getUserToken = async () => {
       try {
-        let token = await AsyncStorage.getItem('token');
-        let user = await AsyncStorage.getItem('profile');
-        dispatch({type: 'RESTORE_TOKEN', payload: token});
-        dispatch({type: 'USER', payload: JSON.parse(user)});
+        await RNSecureKeyStore.get('token').then(
+          (token) => {
+            console.log('TOKEN: ', token);
+            dispatch({type: 'RESTORE_TOKEN', payload: token});
+          },
+          (err) => {
+            console.log('TOKEN ERRRR', err);
+          },
+        );
+
+        await RNSecureKeyStore.get('profile').then(
+          (user) => {
+            console.log('user: ', user);
+            dispatch({type: 'USER', payload: JSON.parse(user)});
+          },
+          (err) => {
+            console.log('ERRR: ', err);
+          },
+        );
       } catch (err) {
         console.log('Restoring token failed: ', err);
       }
